@@ -25,6 +25,9 @@ class Order {
   @HiveField(6)
   final String? username;
 
+  @HiveField(7)
+  final String? notes;
+
   Order({
     required this.id,
     required this.items,
@@ -33,6 +36,7 @@ class Order {
     required this.createdAt,
     this.ipAddress,
     this.username,
+    this.notes,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -47,6 +51,7 @@ class Order {
       createdAt: DateTime.parse(json['createdAt'] as String),
       ipAddress: json['ipAddress'] as String?,
       username: json['username'] as String?,
+      notes: json['notes'] as String?,
     );
   }
 
@@ -59,6 +64,7 @@ class Order {
       'createdAt': createdAt.toIso8601String(),
       'ipAddress': ipAddress,
       'username': username,
+      'notes': notes,
     };
   }
 }

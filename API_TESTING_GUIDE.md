@@ -102,6 +102,12 @@ curl -X POST http://YOUR_IP:8080/orders/update-status \
   }'
 ```
 
+**Note:** When updating order status, the server automatically sends refresh notifications to the client's IP address (from the order's `ipAddress` field) by making GET requests to both:
+- `http://{ipAddress}:8080/refresh`
+- `http://{ipAddress}:8080/notifyorder`
+
+This allows clients to receive real-time notifications when their order status changes.
+
 ---
 
 ### Step 9: Access an Uploaded Image
@@ -423,7 +429,15 @@ curl -X POST http://YOUR_IP:8080/orders/update-status \
   -H "Content-Type: application/json" \
   -d '{"orderId":"ORDER_ID_HERE","status":"done"}'
 
-# 9. Check updated orders
+# 9. Post order to history (use actual order ID)
+curl -X POST http://YOUR_IP:8080/orders/post-to-history \
+  -H "Content-Type: application/json" \
+  -d '{"orderId":"ORDER_ID_HERE"}'
+
+# 10. View order history
+curl http://YOUR_IP:8080/history
+
+# 11. Check updated orders
 curl http://YOUR_IP:8080/orders
 ```
 
@@ -476,6 +490,80 @@ curl -X POST http://YOUR_IP:8080/menu/delete \
   }'
 ```
 
+---
+
+## Order History Operations
+
+### Post Order to History
+
+**Post to History:**
+```bash
+curl -X POST http://YOUR_IP:8080/orders/post-to-history \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "ORDER_ID_HERE"
+  }'
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Order posted to history",
+  "data": {
+    "orderId": "1732108800003",
+    "status": "posted"
+  }
+}
+```
+
+**Important:** Orders can only be posted to history if their status is "done". If you try to post an order with a different status, you will receive a 403 error:
+```json
+{
+  "success": false,
+  "message": "Only orders with status \"done\" can be posted to history",
+  "data": {
+    "currentStatus": "process"
+  }
+}
+```
+
+**What happens when posting to history:**
+1. Order status changes to "posted"
+2. Order is moved from active orders database to history database
+3. Order is removed from `/orders` endpoint results
+4. Order appears in `/history` endpoint results
+
+### Get Order History
+
+**Get All History:**
+```bash
+curl http://YOUR_IP:8080/history
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Order history retrieved",
+  "count": 5,
+  "data": [
+    {
+      "id": "1732108800003",
+      "items": [...],
+      "total": 25000,
+      "status": "posted",
+      "createdAt": "2025-11-21T10:30:00.000Z",
+      "ipAddress": "192.168.30.120",
+      "username": "John Doe"
+    },
+    ...
+  ]
+}
+```
+
+---
+
 ### Order Delete
 
 **Delete Order:**
@@ -487,18 +575,18 @@ curl -X POST http://YOUR_IP:8080/orders/delete \
   }'
 ```
 
-**Important:** Orders can only be deleted if their status is "done". If you try to delete an order with status "ongoing", you will receive a 403 error:
+**Important:** Orders can only be deleted if their status is "new" or "done". If you try to delete an order with status "process", you will receive a 403 error:
 ```json
 {
   "success": false,
-  "message": "Only orders with status \"done\" can be deleted",
+  "message": "Only orders with status \"new\" or \"done\" can be deleted",
   "data": {
-    "currentStatus": "ongoing"
+    "currentStatus": "process"
   }
 }
 ```
 
-To delete an order with "ongoing" status, first update it to "done":
+To delete an order with "process" status, first update it to "done":
 ```bash
 # First, update order status to "done"
 curl -X POST http://YOUR_IP:8080/orders/update-status \
@@ -606,6 +694,11 @@ curl -X POST http://YOUR_IP:8080/orders/delete \
 
 ### Orders
 - `GET /orders` - Get all orders
+- `GET /orders/by-username?username=xxx` - Get orders filtered by username
 - `POST /orders/create` - Create order
 - `POST /orders/update-status` - Update order status
+- `POST /orders/post-to-history` - Post order to history (status becomes "posted")
 - `POST /orders/delete` - Delete order
+
+### History
+- `GET /history` - Get all posted orders from history

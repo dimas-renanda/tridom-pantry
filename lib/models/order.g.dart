@@ -24,13 +24,14 @@ class OrderAdapter extends TypeAdapter<Order> {
       createdAt: fields[4] as DateTime,
       ipAddress: fields[5] as String?,
       username: fields[6] as String?,
+      notes: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Order obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class OrderAdapter extends TypeAdapter<Order> {
       ..writeByte(5)
       ..write(obj.ipAddress)
       ..writeByte(6)
-      ..write(obj.username);
+      ..write(obj.username)
+      ..writeByte(7)
+      ..write(obj.notes);
   }
 
   @override

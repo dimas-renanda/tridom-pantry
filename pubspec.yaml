@@ -41,6 +41,8 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   intl: ^0.19.0
+  just_audio: ^0.9.40
+  flutter_ringtone_player: ^4.0.0+2
 
 dev_dependencies:
   flutter_test:

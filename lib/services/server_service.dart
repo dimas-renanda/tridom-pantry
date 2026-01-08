@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mime/mime.dart';
@@ -89,16 +90,26 @@ class ServerService {
         await _updateMenu(request);
       } else if (path == '/menu/delete' && method == 'POST') {
         await _deleteMenu(request);
+      } else if (path == '/menu/toggle-enabled' && method == 'POST') {
+        await _toggleMenuEnabled(request);
       } else if (path == '/menu/upload-image' && method == 'POST') {
         await _uploadMenuImage(request);
       } else if (path == '/orders' && method == 'GET') {
         await _getOrders(request);
+      } else if (path == '/orders/by-username' && method == 'GET') {
+        await _getOrdersByUsername(request);
       } else if (path == '/orders/create' && method == 'POST') {
         await _createOrder(request);
       } else if (path == '/orders/update-status' && method == 'POST') {
         await _updateOrderStatus(request);
+      } else if (path == '/orders/post-to-history' && method == 'POST') {
+        await _postOrderToHistory(request);
       } else if (path == '/orders/delete' && method == 'POST') {
         await _deleteOrder(request);
+      } else if (path == '/history' && method == 'GET') {
+        await _getHistory(request);
+      } else if (path == '/history/delete' && method == 'DELETE') {
+        await _deleteHistory(request);
       } else if (path == '/images/list' && method == 'GET') {
         await _listImages(request);
       } else if (path.startsWith('/images/')) {
@@ -190,7 +201,8 @@ class ServerService {
 
   // Menu endpoints
   Future<void> _getMenus(HttpRequest request) async {
-    final menus = menuController.getAllMenus();
+    // Return only enabled menu items for API consumers
+    final menus = menuController.getEnabledMenus();
     final baseUrl =
         'http://${serverController.serverAddress.value}:${serverController.serverPort.value}';
 
@@ -233,6 +245,7 @@ class ServerService {
     final price = body['price'];
     final categoryId = body['categoryId'] as String?;
     final imagePath = body['imagePath'] as String?;
+    final isEnabled = body['isEnabled'] as bool? ?? true;
 
     if (name == null || price == null || categoryId == null) {
       _sendResponse(request, 400, {
@@ -247,6 +260,7 @@ class ServerService {
       (price as num).toDouble(),
       categoryId,
       imagePath,
+      isEnabled: isEnabled,
     );
     _sendResponse(request, 200, {
       'success': true,
@@ -256,6 +270,7 @@ class ServerService {
         'price': price,
         'categoryId': categoryId,
         'imagePath': imagePath,
+        'isEnabled': isEnabled,
       },
     });
   }
@@ -267,6 +282,7 @@ class ServerService {
     final price = body['price'];
     final categoryId = body['categoryId'] as String?;
     final imagePath = body['imagePath'] as String?;
+    final isEnabled = body['isEnabled'] as bool?;
 
     if (id == null || name == null || price == null || categoryId == null) {
       _sendResponse(request, 400, {
@@ -282,6 +298,7 @@ class ServerService {
       (price as num).toDouble(),
       categoryId,
       imagePath,
+      isEnabled: isEnabled,
     );
     _sendResponse(request, 200, {
       'success': true,
@@ -313,6 +330,28 @@ class ServerService {
       'success': true,
       'message': 'Menu deleted',
       'data': {'id': id},
+    });
+  }
+
+  Future<void> _toggleMenuEnabled(HttpRequest request) async {
+    final body = await _getRequestBody(request);
+    final id = body['id'] as String?;
+
+    if (id == null) {
+      _sendResponse(request, 400, {
+        'success': false,
+        'message': 'Menu ID is required',
+      });
+      return;
+    }
+
+    menuController.toggleMenuEnabled(id);
+    final menu = menuController.getMenuById(id);
+
+    _sendResponse(request, 200, {
+      'success': true,
+      'message': 'Menu enabled status toggled',
+      'data': {'id': id, 'isEnabled': menu?.isEnabled ?? false},
     });
   }
 
@@ -395,12 +434,40 @@ class ServerService {
     });
   }
 
+  Future<void> _getOrdersByUsername(HttpRequest request) async {
+    final username = request.uri.queryParameters['username'];
+
+    if (username == null || username.isEmpty) {
+      _sendResponse(request, 400, {
+        'success': false,
+        'message': 'Username query parameter is required',
+      });
+      return;
+    }
+
+    final allOrders = orderController.getAllOrders();
+    final filteredOrders =
+        allOrders.where((order) {
+          return order.username != null &&
+              order.username!.toLowerCase() == username.toLowerCase();
+        }).toList();
+
+    _sendResponse(request, 200, {
+      'success': true,
+      'message': 'Orders retrieved for username: $username',
+      'data': filteredOrders.map((order) => order.toJson()).toList(),
+      'count': filteredOrders.length,
+    });
+  }
+
   Future<void> _createOrder(HttpRequest request) async {
     final body = await _getRequestBody(request);
     final itemsData = body['items'] as List?;
     final total = body['total'];
     final ipAddress = body['ipAddress'] as String?;
     final username = body['username'] as String?;
+    final docNo = body['docNo'] as String?;
+    final notes = body['notes'] as String?;
 
     if (itemsData == null || total == null) {
       _sendResponse(request, 400, {
@@ -412,10 +479,12 @@ class ServerService {
 
     final items = itemsData.map((item) => OrderItem.fromJson(item)).toList();
     orderController.createOrder(
+      docNo: docNo,
       items,
       (total as num).toDouble(),
       ipAddress: ipAddress,
       username: username,
+      notes: notes,
     );
 
     _sendResponse(request, 200, {
@@ -426,6 +495,8 @@ class ServerService {
         'total': total,
         'ipAddress': ipAddress,
         'username': username,
+        'docNo': docNo,
+        'notes': notes,
       },
     });
   }
@@ -435,6 +506,8 @@ class ServerService {
     final orderId = body['orderId'] as String?;
     final status = body['status'] as String?;
 
+    print('Update Order Status Request - orderId: $orderId, status: $status');
+
     if (orderId == null || status == null) {
       _sendResponse(request, 400, {
         'success': false,
@@ -443,12 +516,174 @@ class ServerService {
       return;
     }
 
+    // Update order status (notifications will be triggered by OrderController)
     orderController.updateOrderStatus(orderId, status);
+
     _sendResponse(request, 200, {
       'success': true,
       'message': 'Order status updated',
       'data': {'orderId': orderId, 'status': status},
     });
+  }
+
+  Future<void> _postOrderToHistory(HttpRequest request) async {
+    final body = await _getRequestBody(request);
+    final orderId = body['orderId'] as String?;
+
+    print('Post Order to History Request - orderId: $orderId');
+
+    if (orderId == null) {
+      _sendResponse(request, 400, {
+        'success': false,
+        'message': 'OrderId is required',
+      });
+      return;
+    }
+
+    // Check if order exists
+    final order = orderController.orders.firstWhereOrNull(
+      (o) => o.id == orderId,
+    );
+
+    if (order == null) {
+      _sendResponse(request, 404, {
+        'success': false,
+        'message': 'Order not found',
+      });
+      return;
+    }
+
+    // Check if order is done
+    if (order.status != 'done') {
+      _sendResponse(request, 403, {
+        'success': false,
+        'message': 'Only orders with status "done" can be posted to history',
+        'data': {'currentStatus': order.status},
+      });
+      return;
+    }
+
+    // Post to history
+    orderController.postToHistory(orderId);
+
+    _sendResponse(request, 200, {
+      'success': true,
+      'message': 'Order posted to history',
+      'data': {'orderId': orderId, 'status': 'posted'},
+    });
+  }
+
+  Future<void> _getHistory(HttpRequest request) async {
+    // Get optional endDate parameter from query string
+    final endDateStr = request.uri.queryParameters['endDate'];
+
+    var history = orderController.getAllHistory();
+
+    // Filter by endDate if provided
+    if (endDateStr != null && endDateStr.isNotEmpty) {
+      try {
+        // Parse the endDate string (expects format: YYYY-MM-DD or ISO8601)
+        DateTime endDate = DateTime.parse(endDateStr);
+
+        // Set to end of day (23:59:59.999)
+        endDate = DateTime(
+          endDate.year,
+          endDate.month,
+          endDate.day,
+          23,
+          59,
+          59,
+          999,
+        );
+
+        // Filter orders created at or before the endDate
+        history =
+            history.where((order) {
+              return order.createdAt.isBefore(endDate) ||
+                  order.createdAt.isAtSameMomentAs(endDate);
+            }).toList();
+
+        _sendResponse(request, 200, {
+          'success': true,
+          'message': 'Order history retrieved with date filter',
+          'data': history.map((order) => order.toJson()).toList(),
+          'count': history.length,
+          'filter': {
+            'endDate': endDateStr,
+            'endDateParsed': endDate.toIso8601String(),
+          },
+        });
+      } catch (e) {
+        _sendResponse(request, 400, {
+          'success': false,
+          'message': 'Invalid endDate format. Use YYYY-MM-DD or ISO8601 format',
+          'error': e.toString(),
+        });
+        return;
+      }
+    } else {
+      // No filter, return all history
+      _sendResponse(request, 200, {
+        'success': true,
+        'message': 'Order history retrieved',
+        'data': history.map((order) => order.toJson()).toList(),
+        'count': history.length,
+      });
+    }
+  }
+
+  Future<void> _deleteHistory(HttpRequest request) async {
+    // Get optional endDate parameter from query string
+    final endDateStr = request.uri.queryParameters['endDate'];
+
+    DateTime? endDate;
+
+    // Parse endDate if provided
+    if (endDateStr != null && endDateStr.isNotEmpty) {
+      try {
+        // Parse the endDate string (expects format: YYYY-MM-DD or ISO8601)
+        endDate = DateTime.parse(endDateStr);
+
+        // Set to end of day (23:59:59.999)
+        endDate = DateTime(
+          endDate.year,
+          endDate.month,
+          endDate.day,
+          23,
+          59,
+          59,
+          999,
+        );
+      } catch (e) {
+        _sendResponse(request, 400, {
+          'success': false,
+          'message': 'Invalid endDate format. Use YYYY-MM-DD or ISO8601 format',
+          'error': e.toString(),
+        });
+        return;
+      }
+    }
+
+    // Delete history with optional date filter
+    final deletedCount = orderController.deleteHistory(endDate: endDate);
+
+    if (endDate != null) {
+      _sendResponse(request, 200, {
+        'success': true,
+        'message': 'History deleted with date filter',
+        'deletedCount': deletedCount,
+        'filter': {
+          'endDate': endDateStr,
+          'endDateParsed': endDate.toIso8601String(),
+        },
+      });
+    } else {
+      _sendResponse(request, 200, {
+        'success': true,
+        'message': 'All history deleted',
+        'deletedCount': deletedCount,
+      });
+    }
   }
 
   Future<void> _deleteOrder(HttpRequest request) async {
@@ -476,10 +711,11 @@ class ServerService {
       return;
     }
 
-    if (order.status != 'done') {
+    // Allow deletion of orders with status "new" or "done"
+    if (order.status != 'new' && order.status != 'done') {
       _sendResponse(request, 403, {
         'success': false,
-        'message': 'Only orders with status "done" can be deleted',
+        'message': 'Only orders with status "new" or "done" can be deleted',
         'data': {'currentStatus': order.status},
       });
       return;

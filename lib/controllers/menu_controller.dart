@@ -25,14 +25,16 @@ class MenuController extends GetxController {
     String name,
     double price,
     String categoryId,
-    String? imagePath,
-  ) {
+    String? imagePath, {
+    bool isEnabled = true,
+  }) {
     final menu = Menu(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       price: price,
       categoryId: categoryId,
       imagePath: imagePath,
+      isEnabled: isEnabled,
     );
     menuItems.add(menu);
     _menuBox.put(menu.id, menu);
@@ -40,6 +42,10 @@ class MenuController extends GetxController {
 
   List<Menu> getAllMenus() {
     return menuItems;
+  }
+
+  List<Menu> getEnabledMenus() {
+    return menuItems.where((menu) => menu.isEnabled).toList();
   }
 
   Menu? getMenuById(String id) {
@@ -59,16 +65,19 @@ class MenuController extends GetxController {
     String name,
     double price,
     String categoryId,
-    String? imagePath,
-  ) {
+    String? imagePath, {
+    bool? isEnabled,
+  }) {
     final index = menuItems.indexWhere((menu) => menu.id == id);
     if (index != -1) {
+      final currentMenu = menuItems[index];
       final updatedMenu = Menu(
         id: id,
         name: name,
         price: price,
         categoryId: categoryId,
         imagePath: imagePath,
+        isEnabled: isEnabled ?? currentMenu.isEnabled,
       );
       menuItems[index] = updatedMenu;
       _menuBox.put(id, updatedMenu);
@@ -78,5 +87,22 @@ class MenuController extends GetxController {
   void deleteMenu(String id) {
     menuItems.removeWhere((menu) => menu.id == id);
     _menuBox.delete(id);
+  }
+
+  void toggleMenuEnabled(String id) {
+    final index = menuItems.indexWhere((menu) => menu.id == id);
+    if (index != -1) {
+      final currentMenu = menuItems[index];
+      final updatedMenu = Menu(
+        id: currentMenu.id,
+        name: currentMenu.name,
+        price: currentMenu.price,
+        categoryId: currentMenu.categoryId,
+        imagePath: currentMenu.imagePath,
+        isEnabled: !currentMenu.isEnabled,
+      );
+      menuItems[index] = updatedMenu;
+      _menuBox.put(id, updatedMenu);
+    }
   }
 }

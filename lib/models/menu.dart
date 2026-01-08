@@ -19,12 +19,16 @@ class Menu {
   @HiveField(4)
   final String? imagePath;
 
+  @HiveField(5)
+  final bool isEnabled;
+
   Menu({
     required this.id,
     required this.name,
     required this.price,
     required this.categoryId,
     this.imagePath,
+    this.isEnabled = true,
   });
 
   factory Menu.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,7 @@ class Menu {
       price: (json['price'] as num).toDouble(),
       categoryId: json['categoryId'] as String,
       imagePath: json['imagePath'] as String?,
+      isEnabled: json['isEnabled'] as bool? ?? true,
     );
   }
 
@@ -44,6 +49,7 @@ class Menu {
       'price': price,
       'categoryId': categoryId,
       'imagePath': imagePath,
+      'isEnabled': isEnabled,
     };
   }
 }

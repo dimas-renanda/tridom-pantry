@@ -6,22 +6,44 @@ import '../controllers/order_controller.dart';
 import '../controllers/server_controller.dart';
 import '../models/order.dart';
 
-class CreateOrderView extends StatelessWidget {
+class CreateOrderView extends StatefulWidget {
+  const CreateOrderView({super.key});
+
+  @override
+  State<CreateOrderView> createState() => _CreateOrderViewState();
+}
+
+class _CreateOrderViewState extends State<CreateOrderView> {
   final menu_ctrl.MenuController menuController = Get.find();
   final OrderController orderController = Get.find();
   final ServerController serverController = Get.find();
 
-  CreateOrderView({super.key});
+  final selectedItems = <String, RxInt>{}.obs;
+  final total = 0.0.obs;
+  late final TextEditingController usernameController;
+  late final TextEditingController notesController;
+  late final TextEditingController ipAddressController;
+
+  @override
+  void initState() {
+    super.initState();
+    usernameController = TextEditingController();
+    notesController = TextEditingController();
+    ipAddressController = TextEditingController(
+      text: serverController.serverAddress.value,
+    );
+  }
+
+  @override
+  void dispose() {
+    usernameController.dispose();
+    notesController.dispose();
+    ipAddressController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final selectedItems = <String, RxInt>{}.obs;
-    final total = 0.0.obs;
-    final usernameController = TextEditingController();
-    final ipAddressController = TextEditingController(
-      text: serverController.serverAddress.value,
-    );
-
     void updateTotal() {
       double sum = 0.0;
       selectedItems.forEach((menuId, quantity) {
@@ -34,10 +56,6 @@ class CreateOrderView extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Order'),
-        backgroundColor: Colors.blue,
-      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -46,7 +64,7 @@ class CreateOrderView extends StatelessWidget {
             TextField(
               controller: usernameController,
               decoration: const InputDecoration(
-                labelText: 'Username',
+                labelText: 'Order Name',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person),
               ),
@@ -59,6 +77,17 @@ class CreateOrderView extends StatelessWidget {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.computer),
               ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (Optional)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.note),
+                hintText: 'Add any special instructions...',
+              ),
+              maxLines: 2,
             ),
             const SizedBox(height: 16),
             const Text(
@@ -149,11 +178,24 @@ class CreateOrderView extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
+                if (usernameController.text.trim().isEmpty) {
+                  Get.snackbar(
+                    'Error',
+                    'Please enter a username',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
+
                 if (selectedItems.isEmpty) {
                   Get.snackbar(
                     'Error',
                     'Please select at least one item',
                     snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
                   );
                   return;
                 }
@@ -180,9 +222,10 @@ class CreateOrderView extends StatelessWidget {
                       ipAddressController.text.isNotEmpty
                           ? ipAddressController.text
                           : null,
-                  username:
-                      usernameController.text.isNotEmpty
-                          ? usernameController.text
+                  username: usernameController.text.trim(),
+                  notes:
+                      notesController.text.trim().isNotEmpty
+                          ? notesController.text.trim()
                           : null,
                 );
                 Get.back();
@@ -190,6 +233,8 @@ class CreateOrderView extends StatelessWidget {
                   'Success',
                   'Order created successfully',
                   snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.green,
+                  colorText: Colors.white,
                 );
               },
               style: ElevatedButton.styleFrom(

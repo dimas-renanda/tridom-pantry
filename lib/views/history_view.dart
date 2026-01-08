@@ -3,10 +3,10 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../controllers/order_controller.dart';
 
-class ReportView extends StatelessWidget {
+class HistoryView extends StatelessWidget {
   final OrderController orderController = Get.find();
 
-  ReportView({super.key});
+  HistoryView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,24 +17,47 @@ class ReportView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Completed Orders',
+              'Posted Orders',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Expanded(
               child: Obx(() {
-                // Filter to show only 'done' orders
-                final doneOrders =
-                    orderController.orders
-                        .where((order) => order.status == 'done')
-                        .toList();
+                final history = orderController.orderHistory;
 
-                return doneOrders.isEmpty
-                    ? const Center(child: Text('No completed orders yet'))
+                // Debug logging
+                print(
+                  'HistoryView - Total orders in history: ${history.length}',
+                );
+
+                return history.isEmpty
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 64,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No posted orders in history',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Complete orders and post them from Reports page',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
                     : ListView.builder(
-                      itemCount: doneOrders.length,
+                      itemCount: history.length,
                       itemBuilder: (context, index) {
-                        final order = doneOrders[index];
+                        final order = history[index];
                         return Card(
                           elevation: 4,
                           margin: const EdgeInsets.only(bottom: 16),
@@ -47,19 +70,16 @@ class ReportView extends StatelessWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        'Order #${order.id}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                    Text(
+                                      'Order #${order.id}',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    const Chip(
-                                      label: Text('DONE'),
-                                      backgroundColor: Colors.green,
+                                    Chip(
+                                      label: Text(order.status.toUpperCase()),
+                                      backgroundColor: Colors.purple,
                                     ),
                                   ],
                                 ),
@@ -123,29 +143,8 @@ class ReportView extends StatelessWidget {
                                   const SizedBox(height: 4),
                                 ],
                                 Text(
-                                  'Created: ${order.createdAt.toString()}',
+                                  'Created: ${DateFormat('dd MMM yyyy HH:mm').format(order.createdAt)}',
                                   style: const TextStyle(fontSize: 12),
-                                ),
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: ElevatedButton.icon(
-                                    icon: const Icon(Icons.post_add, size: 18),
-                                    label: const Text('Already picked up'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.purple,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 10,
-                                      ),
-                                    ),
-                                    onPressed:
-                                        () => _showPostToHistoryDialog(
-                                          context,
-                                          order,
-                                        ),
-                                  ),
                                 ),
                               ],
                             ),
@@ -157,44 +156,6 @@ class ReportView extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showPostToHistoryDialog(BuildContext context, order) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Post to History'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Post order #${order.id} to history?'),
-            const SizedBox(height: 8),
-            const Text(
-              'This will move the order to history with POSTED status.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-            onPressed: () {
-              orderController.postToHistory(order.id);
-              Get.back();
-              Get.snackbar(
-                'Success',
-                'Order posted to history',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: Colors.purple,
-                colorText: Colors.white,
-              );
-            },
-            child: const Text('POST'),
-          ),
-        ],
       ),
     );
   }
